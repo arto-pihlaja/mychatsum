@@ -1,0 +1,18 @@
+[1.9.2026, 10.00.00] Testiryhmä: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[1.9.2026, 10.00.01] ~ Anna: ‎~ Anna created group “Testiryhmä”
+[1.9.2026, 10.05.00] ~ Anna: Hei kaikki,
+Tervetuloa ryhmään! 🎉
+
+Kokous on ke klo 18.30 ‎<This message was edited>
+[1.9.2026, 10.06.00] Bertta: Katso https://example.com/sivu?x=1 ja kuksaan.fi/123
+‎[1.9.2026, 10.07.00] ~ Anna: ohje.pdf • ‎1 page ‎document omitted
+‎[1.9.2026, 10.08.00] ~ Anna: Aikataulu tässä ‎image omitted
+‎[1.9.2026, 10.08.30] Bertta: ‎image omitted
+[1.9.2026, 10.09.00] ~ Anna: ‎POLL:
+Pääsetkö?
+‎OPTION: Kyllä (2 votes)
+‎OPTION: En (1 votes)
+[2.9.2026, 9.00.00] ~ Anna: Mitä mieltä @⁨~Bertta⁩ , @⁨Cecilia⁩ ja muut?
+[2.9.2026, 9.01.00] Bertta: 👍🏼
+[2.9.2026, 9.02.00] Bertta: *Tärkeää:* muistakaa ilmoittautua 😅
+[2.9.2026, 9.03.00] Cecilia: ‎~ Anna added Cecilia
