@@ -1,4 +1,4 @@
-"""Command line: wa-digest EXPORT.zip -> out/<chat>_<date>.mp3"""
+"""Command line: mychatsum EXPORT.zip -> out/<chat>_<date>.mp3"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .tts import DEFAULT_VOICE, ENGINES
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="wa-digest", description="Read new WhatsApp group messages aloud.")
+    p = argparse.ArgumentParser(prog="mychatsum", description="Read new WhatsApp group messages aloud.")
     p.add_argument("export", type=Path, help="WhatsApp export (.zip or .txt)")
     p.add_argument("--since", help="start point, e.g. 2d, 12h or 2026-09-20 (overrides the bookmark)")
     p.add_argument("--all", action="store_true", help="read the whole export, ignore the bookmark")

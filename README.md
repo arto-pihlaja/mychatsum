@@ -1,4 +1,4 @@
-# wa-digest
+# mychatsum
 
 Turns a WhatsApp group export into an MP3 you can listen to. Only the message
 text is read aloud, prefixed with the sender's first name ("Sari. ..."). Timestamps, system notices, attachments, polls,

@@ -50,8 +50,8 @@ def _settings() -> dict:
     }
 
 
-app = FastAPI(title="wa-digest", docs_url=None, redoc_url=None)
-_security = HTTPBasic(realm="wa-digest")
+app = FastAPI(title="mychatsum", docs_url=None, redoc_url=None)
+_security = HTTPBasic(realm="mychatsum")
 _lock = threading.Lock()  # one conversion at a time; also protects the bookmark
 
 
@@ -60,7 +60,7 @@ def require_auth(creds: HTTPBasicCredentials = Depends(_security)) -> None:
     if not password:
         raise HTTPException(503, "Set the APP_PASSWORD environment variable first.")
     if not secrets.compare_digest(creds.password.encode(), password.encode()):
-        raise HTTPException(401, "Wrong password", headers={"WWW-Authenticate": 'Basic realm="wa-digest"'})
+        raise HTTPException(401, "Wrong password", headers={"WWW-Authenticate": 'Basic realm="mychatsum"'})
 
 
 # ---------- episodes on disk ----------
