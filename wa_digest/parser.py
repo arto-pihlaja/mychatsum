@@ -2,11 +2,13 @@
 
 Supports the iOS format:
     [22.4.2026, 20.06.05] ~ Name: text
+    [4/22/26, 8:06:06 PM] Name: text
 and the common Android format:
     22.4.2026 klo 20.06 - Name: text
     22/04/2026, 20:06 - Name: text
 
-Dates are assumed to be day-month-year (European locales).
+Day/month order is detected per file: 22.4.2026 (day first, European) or
+4/22/26 (month first, US - e.g. WhatsApp desktop in English).
 Lines that don't start with a header belong to the previous message.
 """
 
@@ -22,11 +24,12 @@ from pathlib import Path
 MAX_TEXT_BYTES = 200 * 1024 * 1024  # guard against zip bombs
 LRM = "‎"  # invisible marker WhatsApp puts before system/attachment text
 
-_DATE = r"(?P<d>\d{1,2})[./-](?P<m>\d{1,2})[./-](?P<y>\d{2,4})"
+# a/b are day and month in either order; resolved by _day_first()
+_DATE = r"(?P<a>\d{1,2})(?P<sep>[./-])(?P<b>\d{1,2})[./-](?P<y>\d{2,4})"
 _TIME = r"(?P<H>\d{1,2})[.:](?P<M>\d{2})(?:[.:](?P<S>\d{2}))?(?:\s?(?P<ampm>[AaPp]\.?[Mm]\.?))?"
 
-IOS_HEADER = re.compile(rf"^{LRM}?\[{_DATE},? {_TIME}\] (?P<rest>.*)$")
-ANDROID_HEADER = re.compile(rf"^{LRM}?{_DATE},?(?: klo)? {_TIME} - (?P<rest>.*)$")
+IOS_HEADER = re.compile(rf"^{LRM}?\[{_DATE},?\s{_TIME}\]\s(?:-\s)?(?P<rest>.*)$")
+ANDROID_HEADER = re.compile(rf"^{LRM}?{_DATE},?(?:\sklo)?\s{_TIME}\s-\s(?P<rest>.*)$")
 
 
 @dataclass
@@ -36,7 +39,19 @@ class Message:
     text: str
 
 
-def _to_datetime(m: re.Match) -> datetime:
+def _day_first(matches: list[re.Match]) -> bool:
+    """Decide the date order for a whole export."""
+    if any(int(m["a"]) > 12 for m in matches):
+        return True
+    if any(int(m["b"]) > 12 for m in matches):
+        return False
+    # Ambiguous (all days <= 12): slashes with AM/PM are the US style
+    us_style = any(m["sep"] == "/" and m["ampm"] for m in matches)
+    return not us_style
+
+
+def _to_datetime(m: re.Match, day_first: bool = True) -> datetime:
+    day, month = (int(m["a"]), int(m["b"])) if day_first else (int(m["b"]), int(m["a"]))
     y = int(m["y"])
     if y < 100:
         y += 2000
@@ -46,7 +61,7 @@ def _to_datetime(m: re.Match) -> datetime:
         hour += 12
     elif ampm == "am" and hour == 12:
         hour = 0
-    return datetime(y, int(m["m"]), int(m["d"]), hour, int(m["M"]), int(m["S"] or 0))
+    return datetime(y, month, day, hour, int(m["M"]), int(m["S"] or 0))
 
 
 def _split_sender(rest: str) -> tuple[str | None, str]:
@@ -60,17 +75,21 @@ def _split_sender(rest: str) -> tuple[str | None, str]:
 
 def parse_text(raw: str) -> list[Message]:
     raw = raw.lstrip("﻿")
-    messages: list[Message] = []
+    # pass 1: split into (header match, text) blocks
+    blocks: list[list] = []
     for line in re.split(r"\r?\n", raw):
         match = IOS_HEADER.match(line) or ANDROID_HEADER.match(line)
         if match:
-            sender, text = _split_sender(match["rest"])
-            messages.append(Message(_to_datetime(match), sender, text))
-        elif messages:
-            messages[-1].text += "\n" + line
+            blocks.append([match, match["rest"]])
+        elif blocks:
+            blocks[-1][1] += "\n" + line
         # text before the first header is ignored
-    for msg in messages:
-        msg.text = msg.text.rstrip()
+    # pass 2: dates, now that the day/month order is known
+    day_first = _day_first([b[0] for b in blocks])
+    messages = []
+    for match, rest in blocks:
+        sender, text = _split_sender(rest)
+        messages.append(Message(_to_datetime(match, day_first), sender, text.rstrip()))
     return messages
 
 

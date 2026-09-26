@@ -113,3 +113,26 @@ def test_cli_only_reads_new_messages(tmp_path):
     # Second run: bookmark is at the last message, so nothing new
     assert main(args) == 0
     assert sorted(tmp_path.glob("*.txt")) == first
+
+
+def test_us_date_format_desktop_export():
+    raw = (
+        "[4/22/26, 8:06:06\u202fPM] - +358 40 1234567 added You\r\n"
+        "[4/22/26, 8:11:17 PM] Maija Meikäläinen: Hei kaikki\nToinen rivi\r\n"
+        "[5/1/26, 9:05:00 AM] Bertta: Katso https://example.com/a?b=1 ja http://x.fi/y tästä\r\n"
+    )
+    msgs = parse_text(raw)
+    assert [m.ts for m in msgs] == [
+        datetime(2026, 4, 22, 20, 6, 6), datetime(2026, 4, 22, 20, 11, 17), datetime(2026, 5, 1, 9, 5)]
+    assert msgs[0].sender is None  # "added You" is a system line
+    assert build_script(msgs) == "Maija. Hei kaikki. Toinen rivi.\n\nBertta. Katso ja tästä."
+
+
+def test_ambiguous_dates_default_to_day_first():
+    msgs = parse_text("[3.4.2026, 10.00.00] A: moi\r\n")
+    assert msgs[0].ts == datetime(2026, 4, 3, 10, 0)
+
+
+def test_urls_never_read():
+    for text in ["https://a.b/c", "Linkki: https://teams.microsoft.com/meet/1?p=x", "(http://x.fi)", "www.x.fi/y"]:
+        assert "http" not in (clean_text(text) or "") and "www" not in (clean_text(text) or "")
