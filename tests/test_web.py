@@ -86,3 +86,55 @@ def test_bad_input(client):
     r = client.post("/upload", files={"file": ("x.txt", b"not a chat", "text/plain")}, auth=AUTH)
     assert r.status_code == 422
     assert client.get("/episodes/..%2Fstate.mp3", auth=AUTH).status_code == 404
+
+
+# ---------- security ----------
+
+def _junk_body(counter, mb=40):
+    yield b'--XX\r\nContent-Disposition: form-data; name="file"; filename="a.zip"\r\n\r\n'
+    for _ in range(mb):
+        counter.append(1)
+        yield b"0" * (1024 * 1024)
+    yield b"\r\n--XX--\r\n"
+
+
+def test_unauthenticated_upload_is_refused_before_reading_body(client):
+    read = []
+    r = client.post("/upload", content=_junk_body(read), headers={"content-type": "multipart/form-data; boundary=XX"})
+    assert r.status_code == 401
+    assert len(read) == 0  # not a single MB was consumed
+
+
+def test_oversized_upload_rejected(client, monkeypatch):
+    monkeypatch.setenv("MAX_UPLOAD_MB", "1")
+    # declared size too big -> refused up front
+    r = client.post("/upload", content=b"x" * (2 * 1024 * 1024), auth=AUTH,
+                    headers={"content-type": "multipart/form-data; boundary=XX"})
+    assert r.status_code == 413
+    # no Content-Length (streamed) -> cut off while reading
+    read = []
+    r = client.post("/upload", content=_junk_body(read, mb=5), auth=AUTH,
+                    headers={"content-type": "multipart/form-data; boundary=XX"})
+    assert r.status_code == 413  # (TestClient drains the body itself; see real-server check)
+
+
+def test_cross_site_post_refused(client):
+    r = client.post("/upload", files=export_zip(), data={"since": "all"}, auth=AUTH,
+                    headers={"origin": "https://evil.example"})
+    assert r.status_code == 403
+    same = client.post("/upload", files=export_zip(), data={"since": "all"}, auth=AUTH,
+                       headers={"origin": "http://testserver"})
+    assert same.status_code == 200
+
+
+def test_security_headers(client):
+    for r in (client.get("/health"), client.get("/"), client.get("/", auth=AUTH)):
+        assert r.headers["x-frame-options"] == "DENY"
+        assert r.headers["x-content-type-options"] == "nosniff"
+        assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
+def test_odd_upload_filenames_are_safe(client):
+    for name in ["..", "", ".hidden.zip", "../../etc/passwd"]:
+        r = client.post("/upload", files={"file": (name, b"not a chat")}, auth=AUTH)
+        assert r.status_code == 422, name  # handled as a bad export, not a crash

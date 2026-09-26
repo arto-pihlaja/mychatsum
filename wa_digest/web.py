@@ -12,6 +12,7 @@ Environment:
 
 from __future__ import annotations
 
+import base64
 import html
 import json
 import os
@@ -21,6 +22,7 @@ import tempfile
 import threading
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -34,6 +36,17 @@ from .tts import DEFAULT_VOICE
 SINCE_CHOICES = {"new": None, "1d": "1d", "3d": "3d", "7d": "7d", "all": "all"}
 RATE_CHOICES = {"normal": "+0%", "faster": "+25%", "fastest": "+50%"}
 _NAME_OK = re.compile(r"^[\w.-]+$")
+_UPLOAD_NAME_OK = re.compile(r"^[\w][\w .,()+-]*\.(zip|txt)$", re.IGNORECASE)
+PUBLIC_PATHS = {"/health"}
+SECURITY_HEADERS = [
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"referrer-policy", b"no-referrer"),
+    (b"strict-transport-security", b"max-age=31536000"),
+    (b"content-security-policy",
+     b"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+     b"form-action 'self'; frame-ancestors 'none'; base-uri 'none'"),
+]
 
 
 def _settings() -> dict:
@@ -50,7 +63,110 @@ def _settings() -> dict:
     }
 
 
+class GuardMiddleware:
+    """Runs before FastAPI reads the request body.
+
+    - password check (HTTP Basic) for everything except /health
+    - request size limit, from Content-Length and while streaming
+    - POSTs from other websites are refused (CSRF: browsers send saved logins along)
+    - security headers on every response
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                message.setdefault("headers", [])
+                message["headers"] = list(message["headers"]) + SECURITY_HEADERS
+            await send(message)
+
+        s = _settings()
+        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
+
+        if scope["path"] not in PUBLIC_PATHS:
+            problem = _auth_problem(headers.get("authorization", ""), s["password"])
+            if problem:
+                return await _plain(send_with_headers, *problem)
+            if scope["method"] == "POST" and not _same_origin(headers):
+                return await _plain(send_with_headers, 403, "Cross-site request refused")
+
+        limit = s["max_bytes"] + 64 * 1024  # room for form fields around the file
+        length = headers.get("content-length", "")
+        if length.isdigit() and int(length) > limit:
+            return await _plain(send_with_headers, 413, "File too large")
+
+        received = 0
+        too_large = False
+
+        async def limited_receive():
+            nonlocal received, too_large
+            if too_large:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    too_large = True  # stop reading; the app sees a disconnect
+                    return {"type": "http.disconnect"}
+            return message
+
+        replaced = False
+
+        async def guarded_send(message):
+            nonlocal replaced
+            if too_large:
+                # whatever the app answers to the cut-off body, tell the client why
+                if message["type"] == "http.response.start" and not replaced:
+                    replaced = True
+                    await _plain(send_with_headers, 413, "File too large")
+                return
+            await send_with_headers(message)
+
+        await self.app(scope, limited_receive, guarded_send)
+        if too_large and not replaced:
+            await _plain(send_with_headers, 413, "File too large")
+
+
+def _auth_problem(header: str, password: str) -> tuple[int, str, list] | None:
+    if not password:
+        return 503, "Set the APP_PASSWORD environment variable first.", []
+    challenge = [(b"www-authenticate", b'Basic realm="mychatsum"')]
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() != "basic":
+        return 401, "Login required", challenge
+    try:
+        _, _, given = base64.b64decode(value).decode("utf-8").partition(":")
+    except (ValueError, UnicodeDecodeError):
+        return 401, "Login required", challenge
+    if not secrets.compare_digest(given.encode(), password.encode()):
+        return 401, "Wrong password", challenge
+    return None
+
+
+def _same_origin(headers: dict) -> bool:
+    """Browsers send Origin on cross-site POSTs; scripts and Shortcuts usually send none."""
+    origin = headers.get("origin")
+    if not origin:
+        return True
+    if origin == "null":
+        return False
+    return urlsplit(origin).netloc == headers.get("host", "")
+
+
+async def _plain(send, status: int, text: str, extra_headers: list | None = None):
+    body = text.encode()
+    headers = [(b"content-type", b"text/plain; charset=utf-8"), (b"content-length", str(len(body)).encode())]
+    await send({"type": "http.response.start", "status": status, "headers": headers + (extra_headers or [])})
+    await send({"type": "http.response.body", "body": body})
+
+
 app = FastAPI(title="mychatsum", docs_url=None, redoc_url=None)
+app.add_middleware(GuardMiddleware)
 _security = HTTPBasic(realm="mychatsum")
 _lock = threading.Lock()  # one conversion at a time; also protects the bookmark
 
@@ -131,7 +247,9 @@ async def upload(
         raise HTTPException(422, f"since must be one of {', '.join(SINCE_CHOICES)}")
     wants_html = "text/html" in request.headers.get("accept", "")
 
-    filename = Path(file.filename or "export.zip").name
+    filename = Path(file.filename or "").name
+    if not _UPLOAD_NAME_OK.match(filename):
+        filename = "export.zip"
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / filename
         size = 0

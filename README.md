@@ -99,6 +99,11 @@ $env:APP_PASSWORD="choose-one"; .venv\Scripts\uvicorn wa_digest.web:app --reload
 | `KEEP_EPISODES` | `30` | older episodes are deleted |
 | `MAX_UPLOAD_MB` | `50` | upload limit |
 
+Security: the password and upload size are checked before the request body is
+read, POSTs from other websites are refused, and standard security headers are
+sent. Keep 2FA on your GitHub and Railway accounts - anyone who can push to
+the repo or open the Railway project can read `APP_PASSWORD`.
+
 API for scripts/Shortcuts: `POST /upload` (multipart: `file`, optional
 `since` = `new`/`1d`/`3d`/`7d`/`all`, `rate` = `normal`/`faster`/`fastest`)
 returns JSON with `audio_url` and `page_url`.

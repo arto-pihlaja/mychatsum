@@ -1,5 +1,7 @@
-edge-tts>=7.0
-emoji>=2.10
-fastapi>=0.110
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9
+# Exact versions so a redeploy can't silently pick up a new release.
+# Upgrade deliberately: bump a version, run the tests, push.
+edge-tts==7.2.8
+emoji==2.16.0
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32

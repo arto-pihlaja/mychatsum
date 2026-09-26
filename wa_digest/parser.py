@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-MAX_TEXT_BYTES = 200 * 1024 * 1024  # guard against zip bombs
+MAX_TEXT_BYTES = 20 * 1024 * 1024  # guard against zip bombs; real exports are a few MB
 LRM = "‎"  # invisible marker WhatsApp puts before system/attachment text
 
 # a/b are day and month in either order; resolved by _day_first()

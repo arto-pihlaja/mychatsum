@@ -3,7 +3,7 @@ name = "mychatsum"
 version = "0.1.0"
 description = "Read new WhatsApp group messages aloud"
 requires-python = ">=3.10"
-dependencies = ["edge-tts>=7.0", "emoji>=2.10"]
+dependencies = ["edge-tts>=7.0", "emoji>=2.10", "fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
 
 [project.scripts]
 mychatsum = "wa_digest.cli:main"
