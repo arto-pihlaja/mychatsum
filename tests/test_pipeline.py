@@ -3,7 +3,8 @@ from datetime import datetime
 from pathlib import Path
 
 from wa_digest.cleaner import build_script, clean_text, first_name
-from wa_digest.cli import chat_name, main
+from wa_digest.cli import main
+from wa_digest.core import chat_name
 from wa_digest.parser import parse_export, parse_text
 from wa_digest.state import Bookmark, parse_since
 

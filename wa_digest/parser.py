@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+MAX_TEXT_BYTES = 200 * 1024 * 1024  # guard against zip bombs
 LRM = "‎"  # invisible marker WhatsApp puts before system/attachment text
 
 _DATE = r"(?P<d>\d{1,2})[./-](?P<m>\d{1,2})[./-](?P<y>\d{2,4})"
@@ -83,6 +84,8 @@ def read_export(path: str | Path) -> str:
                 raise ValueError(f"No .txt file inside {path.name}")
             # iOS uses _chat.txt; Android "WhatsApp Chat with X.txt"
             name = "_chat.txt" if "_chat.txt" in txt_names else txt_names[0]
+            if zf.getinfo(name).file_size > MAX_TEXT_BYTES:
+                raise ValueError(f"{name} is too large")
             return io.TextIOWrapper(zf.open(name), encoding="utf-8").read()
     return path.read_text(encoding="utf-8")
 

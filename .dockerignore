@@ -1,0 +1,9 @@
+.venv/
+.git/
+tests/
+out/
+data/
+*.zip
+*.mp3
+state.json
+chatdata/

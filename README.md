@@ -77,8 +77,58 @@ Tests use synthetic fixtures only (`tests/fixtures`). Don't commit real exports.
   blocked or throttled, add an Azure TTS engine in `tts.py` (same voices, official).
 - Behind an HTTP proxy, set `EDGE_TTS_PROXY`.
 
-## Roadmap
+## Web app (for the phone)
 
-- [ ] FastAPI service: `POST /upload` (zip from an iOS Shortcut), `GET /feed.xml` private podcast feed
-- [ ] Deploy on Railway with a volume for `state.json` and MP3s, token auth
-- [ ] Optional LLM summary mode
+`wa_digest/web.py` is a small FastAPI app: upload the export zip, get a list
+of episodes with an audio player (plays directly in Safari), text and download
+links, and a delete button. Protected with HTTP Basic auth (any user name,
+password from `APP_PASSWORD`).
+
+Run locally:
+
+```powershell
+$env:APP_PASSWORD="choose-one"; .venv\Scripts\uvicorn wa_digest.web:app --reload
+# open http://127.0.0.1:8000
+```
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `APP_PASSWORD` | (required) | login password; the app refuses requests without it |
+| `DATA_DIR` | `data` (`/data` in Docker) | episodes + bookmark |
+| `TTS_ENGINE` / `TTS_VOICE` | `edge` / `fi-FI-NooraNeural` | speech settings |
+| `KEEP_EPISODES` | `30` | older episodes are deleted |
+| `MAX_UPLOAD_MB` | `50` | upload limit |
+
+API for scripts/Shortcuts: `POST /upload` (multipart: `file`, optional
+`since` = `new`/`1d`/`3d`/`7d`/`all`, `rate` = `normal`/`faster`/`fastest`)
+returns JSON with `audio_url` and `page_url`.
+
+## Deploy on Railway
+
+1. Push this repo to GitHub.
+2. Railway → New Project → Deploy from GitHub repo. It builds the `Dockerfile`.
+3. Service → Variables: add `APP_PASSWORD`.
+4. Service → right-click → Attach Volume, mount path `/data`
+   (otherwise episodes and the bookmark vanish on every deploy).
+5. Service → Settings → Networking → Generate Domain.
+6. Optional, to save credit: Settings → enable Serverless (sleeps when idle;
+   the first request after a pause is slow).
+
+## On the iPhone
+
+Simple way:
+
+1. WhatsApp → group → name → Export Chat → Without Media → **Save to Files**.
+2. Open the app URL in Safari (add it to the Home Screen), choose the zip, tap
+   *Tee äänitiedosto*, and play.
+
+One-tap way (Shortcuts app), once:
+
+1. New shortcut → turn on **Show in Share Sheet**, accepting Files.
+2. Action **Get Contents of URL**: `https://<your-app>/upload`, Method POST,
+   Request Body *Form*, field `file` (type File) = *Shortcut Input*;
+   Header `Authorization` = `Basic <base64 of user:password>`.
+3. Action **Get Dictionary Value** `page_url` → **Open URLs**.
+
+Then WhatsApp → Export Chat → Without Media → pick the shortcut; Safari opens
+the list with the new episode on top.

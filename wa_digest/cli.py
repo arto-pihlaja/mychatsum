@@ -3,29 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import re
 import sys
-from datetime import datetime
 from pathlib import Path
 
-from .cleaner import build_script
-from .parser import LRM, Message, parse_export
-from .state import Bookmark, parse_since
-from .tts import DEFAULT_VOICE, ENGINES, synthesize
-
-
-def chat_name(messages: list[Message], path: Path) -> str:
-    """Group name from the iOS encryption notice, else from the file name."""
-    for msg in messages[:3]:
-        if msg.sender and "end-to-end encrypted" in msg.text and msg.text.startswith(LRM):
-            return msg.sender.rstrip(":").strip()
-    stem = re.sub(r"^[0-9a-f]{8}-", "", path.stem)  # upload prefixes like 'a29e7f06-'
-    stem = re.sub(r"^WhatsApp[ _]Chat[ _-]*(with[ _]|-[ _])?", "", stem, flags=re.IGNORECASE)
-    return stem.replace("_", " ").strip(" -") or "chat"
-
-
-def slug(name: str) -> str:
-    return re.sub(r"[^\w]+", "-", name).strip("-").lower() or "chat"
+from .core import NothingNew, make_episode
+from .state import Bookmark
+from .tts import DEFAULT_VOICE, ENGINES
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -45,38 +28,24 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-bookmark", action="store_true", help="don't move the bookmark forward")
     args = p.parse_args(argv)
 
-    messages = parse_export(args.export)
-    if not messages:
-        print("No messages found - is this a WhatsApp export?", file=sys.stderr)
-        return 1
-    chat = chat_name(messages, args.export)
-    bookmark = Bookmark(args.state)
-
-    if args.all:
-        start = None
-    elif args.since:
-        start = parse_since(args.since)
-    else:
-        start = bookmark.get(chat) or parse_since(args.first_run, now=messages[-1].ts)
-
-    new = [m for m in messages if start is None or m.ts > start]
-    script = build_script(new, day_headings=args.dates, names=not args.no_names)
-    if not script:
-        print(f"{chat}: nothing new since {start:%d.%m.%Y %H:%M}." if start else f"{chat}: nothing to read.")
+    try:
+        ep = make_episode(
+            args.export, args.out, Bookmark(args.state),
+            since=args.since, read_all=args.all, first_run=args.first_run,
+            engine=args.engine, voice=args.voice, rate=args.rate,
+            names=not args.no_names, dates=args.dates,
+            audio=not args.text_only, move_bookmark=not args.no_bookmark,
+        )
+    except NothingNew as e:
+        print(e)
         return 0
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
 
-    stamp = new[-1].ts.strftime("%Y-%m-%d_%H%M")
-    base = args.out / f"{slug(chat)}_{stamp}"
-    args.out.mkdir(parents=True, exist_ok=True)
-    base.with_suffix(".txt").write_text(script, encoding="utf-8")
-    print(f"{chat}: {len(new)} new messages, {len(script)} characters -> {base.with_suffix('.txt')}")
-
-    if not args.text_only:
-        mp3 = synthesize(script, base.with_suffix(".mp3"), engine=args.engine, voice=args.voice, rate=args.rate)
-        print(f"Audio: {mp3}")
-
-    if not args.no_bookmark:
-        bookmark.set(chat, new[-1].ts)
+    print(f"{ep.chat}: {ep.message_count} new messages, {ep.chars} characters -> {ep.text_path}")
+    if ep.audio_path:
+        print(f"Audio: {ep.audio_path}")
     return 0
 
 

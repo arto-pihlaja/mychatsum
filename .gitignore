@@ -7,3 +7,5 @@ state.json
 # never commit real chat exports
 *.zip
 exports/
+data/
+chatdata/

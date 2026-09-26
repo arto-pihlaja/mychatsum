@@ -1,2 +1,5 @@
 edge-tts>=7.0
 emoji>=2.10
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
