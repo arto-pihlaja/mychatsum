@@ -17,7 +17,7 @@ python3 -m venv .venv
 Windows (PowerShell):
 
 ```powershell
-py -m venv .venv
+python -m venv .venv
 .venv\Scripts\pip install -r requirements-dev.txt
 .venv\Scripts\python -m pytest
 .venv\Scripts\python -m wa_digest "WhatsApp Chat - My Group.zip"
