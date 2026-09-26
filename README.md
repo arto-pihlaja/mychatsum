@@ -1,7 +1,7 @@
 # wa-digest
 
 Turns a WhatsApp group export into an MP3 you can listen to. Only the message
-text is read aloud: names, timestamps, system notices, attachments, polls,
+text is read aloud, prefixed with the sender's first name ("Sari. ..."). Timestamps, system notices, attachments, polls,
 @-mentions, URLs and emojis are left out. A bookmark remembers where you
 stopped, so each run reads only messages that are new since the last run.
 
@@ -43,6 +43,8 @@ Useful options:
 | `--first-run 1d` | window used when there's no bookmark yet (default 1 day) |
 | `--rate +25%` | speak faster |
 | `--voice fi-FI-HarriNeural` | other voices: `fi-FI-NooraNeural` (default), `fi-FI-SelmaNeural` |
+| `--dates` | announce the day when it changes (off by default) |
+| `--no-names` | don't start messages with the sender's first name |
 | `--text-only` | only write the cleaned script, no audio |
 | `--no-bookmark` | don't move the bookmark (good for trying things out) |
 | `--engine espeak` | offline robot voice for testing (needs `espeak-ng` + `ffmpeg`) |

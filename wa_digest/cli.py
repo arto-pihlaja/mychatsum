@@ -39,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--engine", choices=sorted(ENGINES), default="edge")
     p.add_argument("--voice", default=DEFAULT_VOICE)
     p.add_argument("--rate", default="+0%", help="speaking speed, e.g. +25%%")
-    p.add_argument("--no-dates", action="store_true", help="don't announce the day between messages")
+    p.add_argument("--dates", action="store_true", help="announce the day when it changes")
+    p.add_argument("--no-names", action="store_true", help="don't say the sender's first name")
     p.add_argument("--text-only", action="store_true", help="write the script as .txt, no audio")
     p.add_argument("--no-bookmark", action="store_true", help="don't move the bookmark forward")
     args = p.parse_args(argv)
@@ -59,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
         start = bookmark.get(chat) or parse_since(args.first_run, now=messages[-1].ts)
 
     new = [m for m in messages if start is None or m.ts > start]
-    script = build_script(new, day_headings=not args.no_dates)
+    script = build_script(new, day_headings=args.dates, names=not args.no_names)
     if not script:
         print(f"{chat}: nothing new since {start:%d.%m.%Y %H:%M}." if start else f"{chat}: nothing to read.")
         return 0

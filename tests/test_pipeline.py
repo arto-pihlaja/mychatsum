@@ -2,7 +2,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from wa_digest.cleaner import build_script, clean_text
+from wa_digest.cleaner import build_script, clean_text, first_name
 from wa_digest.cli import chat_name, main
 from wa_digest.parser import parse_export, parse_text
 from wa_digest.state import Bookmark, parse_since
@@ -31,15 +31,45 @@ def test_android_parsing():
 
 def test_script_contains_only_speakable_text():
     script = build_script(ios())
-    for banned in ["Anna", "http", "kuksaan", "omitted", "POLL", "Kyllä", "edited", "pdf",
-                   "Bertta", "Cecilia", "encrypted", "added", "*", "🎉", "10.05", "⁨"]:
+    for banned in ["Ylikantola", "http", "kuksaan", "omitted", "page", "POLL", "Kyllä", "edited",
+                   "encrypted", "added", "created", "*", "~", "🎉", "10.05", "syyskuuta", "\u2068"]:
         assert banned not in script, banned
-    assert "Hei kaikki. Tervetuloa ryhmään! Kokous on ke klo 18.30." in script
-    assert "Aikataulu tässä." in script  # image caption kept
-    assert "Mitä mieltä, ja muut?" in script
-    assert "Tärkeää: muistakaa ilmoittautua." in script
-    assert script.startswith("Tiistai 1. syyskuuta.")
+    assert script.split("\n\n") == [
+        "Anna. Hei kaikki. Tervetuloa ryhmään! Kokous on ke klo 18.30.",
+        "Bertta. Katso ja.",
+        "Anna. ohje.pdf.",
+        "Anna. Aikataulu tässä.",
+        "Anna. Mitä mieltä, ja muut?",
+        "Bertta. Tärkeää: muistakaa ilmoittautua.",
+    ]
+
+
+def test_user_example():
+    raw = (
+        "[22.4.2026, 20.20.13] ~\u202fMaija Meikäläinen: Koekisa toteutetaan kalojen kuvilla.\r\n"
+        "[22.4.2026, 20.33.24] ~\u202fMaija Meikäläinen: \u200e~\u202fMaija Meikäläinen changed this group's icon\r\n"
+        "\u200e[22.4.2026, 20.54.33] ~\u202fMaija Meikäläinen: ohjeet-kaikille.pdf • \u200e1 page \u200edocument omitted\r\n"
+        "[22.4.2026, 21.04.30] ~\u202fMaija Meikäläinen: Tästä tuli tällanen infotulva.\nSorry 😬\r\n"
+    )
+    assert build_script(parse_text(raw)) == (
+        "Maija. Koekisa toteutetaan kalojen kuvilla.\n\n"
+        "Maija. ohjeet-kaikille.pdf.\n\n"
+        "Maija. Tästä tuli tällanen infotulva. Sorry."
+    )
+
+
+def test_day_headings_optional():
+    script = build_script(ios(), day_headings=True, names=False)
+    assert script.startswith("Tiistai 1. syyskuuta.\n\nHei kaikki.")
     assert "Keskiviikko 2. syyskuuta." in script
+
+
+def test_first_name():
+    assert first_name("~\u202fSari Ylikantola") == "Sari"
+    assert first_name("~ E e v a K") == "Eeva"
+    assert first_name("Mare") == "Mare"
+    assert first_name("+358 44 1234567") is None
+    assert first_name(None) is None
 
 
 def test_emoji_only_message_is_dropped():
@@ -47,8 +77,8 @@ def test_emoji_only_message_is_dropped():
 
 
 def test_android_script():
-    script = build_script(parse_export(FIX / "android_chat.txt"), day_headings=False)
-    assert script == "Hei kaikki. toinen rivi.\n\nMoi taas."
+    script = build_script(parse_export(FIX / "android_chat.txt"))
+    assert script == "Anna. Hei kaikki. toinen rivi.\n\nBertta. Moi taas."
 
 
 def test_zip_input_and_chat_name(tmp_path):
