@@ -2,7 +2,7 @@
 name = "wa-digest"
 version = "0.1.0"
 description = "Read new WhatsApp group messages aloud"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = ["edge-tts>=7.0", "emoji>=2.10"]
 
 [project.scripts]
