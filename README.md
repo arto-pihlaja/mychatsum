@@ -7,9 +7,20 @@ stopped, so each run reads only messages that are new since the last run.
 
 ## Setup
 
+Linux/macOS:
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+py -m venv .venv
+.venv\Scripts\pip install -r requirements-dev.txt
+.venv\Scripts\python -m pytest
+.venv\Scripts\python -m wa_digest "WhatsApp Chat - My Group.zip"
 ```
 
 ## Use
